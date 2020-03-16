@@ -10,9 +10,22 @@
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
         <service
-            android:name=".MusicPlayingService"
+            android:name=".MotionDetectorService"
             android:enabled="true"
             android:exported="true"></service>
+        <service
+            android:name=".stepcount.StepCountService"
+            android:enabled="true"
+            android:exported="true" />
+        <service
+            android:name=".musicplaying.MusicPlayingService"
+            android:enabled="true"
+            android:exported="true" />
+        <service android:name=".musicplaying.MusicService">
+            <intent-filter>
+                <action android:name="android.media.browse.MediaBrowserService" />
+            </intent-filter>
+        </service>
 
         <activity
             android:name=".MainActivity"

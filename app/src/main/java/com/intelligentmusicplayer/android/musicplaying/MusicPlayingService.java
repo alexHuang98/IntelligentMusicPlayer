@@ -1,12 +1,13 @@
-package com.intelligentmusicplayer.android;
+package com.intelligentmusicplayer.android.musicplaying;
 
 import android.app.Service;
 import android.content.Intent;
 import android.media.MediaPlayer;
 import android.os.Binder;
 import android.os.IBinder;
-import android.util.Log;
 import android.widget.Toast;
+
+import com.intelligentmusicplayer.android.R;
 
 public class MusicPlayingService extends Service {
 
@@ -19,7 +20,6 @@ public class MusicPlayingService extends Service {
     private int[] progress = new int[3];
 
     private int[] lastId = new int[3];
-
 
     private int current_playing;
 
@@ -39,9 +39,9 @@ public class MusicPlayingService extends Service {
         }
     }
 
-    private MusicBinder mbinder = new MusicBinder();
+    private MusicBinder mBinder = new MusicBinder();
 
-    class MusicBinder extends Binder{
+    public class MusicBinder extends Binder{
 
         public void play(int playType){
             if(mediaPlayer!=null&&mediaPlayer.isPlaying()){
@@ -99,6 +99,6 @@ public class MusicPlayingService extends Service {
             progress[i]=0;
             lastId[i]=typeToId[i];
         }
-        return mbinder;
+        return mBinder;
     }
 }
