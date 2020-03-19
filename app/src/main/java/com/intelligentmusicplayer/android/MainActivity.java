@@ -23,7 +23,7 @@ import android.widget.Toast;
 import com.google.android.material.snackbar.Snackbar;
 import com.intelligentmusicplayer.android.musicplaying.MusicPlayingService;
 
-public class MainActivity extends AppCompatActivity implements View.OnClickListener{
+public class MainActivity extends BaseActivity implements View.OnClickListener{
 
 
     private static final String TAG = "MainActivityHPY";
@@ -41,9 +41,9 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             switch (msg.what){
                 case 1:
                     refreshMovingState(msg.arg1);
-                    if(msg.arg2!=-1){
-                        refreshCurrentSteps(msg.arg2);
-                    }
+                    break;
+                case 2:
+                    refreshCurrentSteps(msg.arg2,msg.arg1);
                     break;
                     default:
             }
@@ -63,13 +63,30 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             motionDetectorService = motionBinder.getService();
             motionDetectorService.registerCallback(new UpdateUiCallBack() {
                 @Override
-                public void updateUi(int type, int steps) {
+                public void updateUi(int type) {
                     Message msg = new Message();
                     msg.what = 1;
                     msg.arg1 = type;
-                    msg.arg2 = steps;
                     mHandler.sendMessage(msg);
                 }
+
+                @Override
+                public void updateSteps(boolean isHeartRated, int steps){
+                    Message msg = new Message();
+                    msg.what = 2;
+                    msg.arg1 = steps;
+                    if(isHeartRated)
+                    {
+                        msg.arg2 =1;
+
+                    }
+                    else
+                        msg.arg2=0;
+                    mHandler.sendMessage(msg);
+                }
+
+
+
             });
 
         }
@@ -96,6 +113,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         pause_button.setOnClickListener(this);
 
         Intent intent = new Intent(this,MotionDetectorService.class);
+
         bindService(intent,connection,BIND_AUTO_CREATE);
         currentType = MusicPlayingService.SLOW;
         refreshMovingState(currentType);
@@ -107,10 +125,9 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         movingState.setText("当前运动状态："+typeToState[state]);
     }
 
-    private void refreshCurrentSteps(Integer steps){
-
-
-        currentSteps.setText("当前步数："+steps.toString());
+    private void refreshCurrentSteps(int detectorType, Integer steps){
+        String typeToDetector[] = {"步数","心率"};
+        currentSteps.setText("当前"+typeToDetector[detectorType]+"："+steps.toString());
     }
 
     @Override
@@ -125,17 +142,20 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             case R.id.simulation:
                 if (!item.isChecked()) {
                     item.setChecked(true);
+                    motionBinder.startHeartDetector(MotionDetectorService.HeartrateDetectorState.SIMULATION);
 
                     Snackbar.make(toolbar, "开始模拟", Snackbar.LENGTH_SHORT).setAction("Undo",
                             new View.OnClickListener() {
                                 @Override
                                 public void onClick(View v) {
+                                    motionBinder.startHeartDetector(MotionDetectorService.HeartrateDetectorState.NONE);
                                     Toast.makeText(MainActivity.this, "停止模拟", Toast.LENGTH_SHORT).show();
                                 }
                             }).show();
                 }
                 else{
                     item.setChecked(false);
+                    motionBinder.startHeartDetector(MotionDetectorService.HeartrateDetectorState.NONE);
                     Toast.makeText(MainActivity.this, "停止模拟", Toast.LENGTH_SHORT).show();
                 }
                 break;

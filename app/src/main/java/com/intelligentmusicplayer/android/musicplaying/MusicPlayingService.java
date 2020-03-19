@@ -50,6 +50,7 @@ public class MusicPlayingService extends Service {
                     current_playing = playType;
                     mediaPlayer.stop();
                     mediaPlayer.release();
+                    mediaPlayer = null;
                     initMediaPlayer(lastId[playType]);
                     mediaPlayer.seekTo(progress[playType]);
                     mediaPlayer.start();
@@ -60,6 +61,7 @@ public class MusicPlayingService extends Service {
                 {
                     mediaPlayer.stop();
                     mediaPlayer.release();
+                    mediaPlayer = null;
                     initMediaPlayer(lastId[playType]);
                 }
                 mediaPlayer.seekTo(progress[playType]);
@@ -68,6 +70,8 @@ public class MusicPlayingService extends Service {
             else{
                 Toast.makeText(MusicPlayingService.this,
                         "MediaPlayer is null",Toast.LENGTH_SHORT).show();
+                initMediaPlayer(lastId[playType]);
+                mediaPlayer.start();
             }
         }
 
@@ -80,13 +84,20 @@ public class MusicPlayingService extends Service {
     }
 
     @Override
-    public void onDestroy() {
-        super.onDestroy();
+    public boolean onUnbind(Intent intent) {
         if(mediaPlayer!=null)
         {
             mediaPlayer.stop();
             mediaPlayer.release();
+            mediaPlayer = null;
         }
+        return super.onUnbind(intent);
+    }
+
+    @Override
+    public void onDestroy() {
+        super.onDestroy();
+
     }
 
     @Override
@@ -100,5 +111,13 @@ public class MusicPlayingService extends Service {
             lastId[i]=typeToId[i];
         }
         return mBinder;
+    }
+
+    @Override
+    public int onStartCommand(Intent intent, int flags, int startId) {
+        //返回START_STICKY ：在运行onStartCommand后service进程被kill后，那将保留在开始状态，但是不保留那些传入的intent。
+        // 不久后service就会再次尝试重新创建，因为保留在开始状态，在创建service后将保证调用onstartCommand。
+        // 如果没有传递任何开始命令给service，那将获取到null的intent。
+        return START_STICKY;
     }
 }

@@ -8,9 +8,10 @@ public interface UpdateUiCallBack {
     /**
      * 更新UI步数
      *
-     * @param currentSteps 步数
+     *
      *
      * @param type 当前状态
      */
-    void updateUi(int type, int currentSteps);
+    void updateUi(int type);
+    void updateSteps(boolean isHeartRated, int steps);
 }

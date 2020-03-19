@@ -4,6 +4,7 @@ import android.app.Service;
 import android.content.ComponentName;
 import android.content.Intent;
 import android.content.ServiceConnection;
+import android.content.pm.PackageManager;
 import android.os.Binder;
 import android.os.Handler;
 import android.os.IBinder;
@@ -28,38 +29,69 @@ public class MotionDetectorService extends Service {
     
     private MotionBinder mBinder = new MotionBinder();
 
+    // binders for related services
     private MusicPlayingService.MusicBinder musicBinder;
 
     private StepCountService.StepBinder stepBinder;
 
+    private HeartbeatService.HeartbeatBinder heartbeatBinder;
+
     int currentType = MusicPlayingService.SLOW;
 
-    public static final int TIMER = 0;
-
-    private int timeScale = 60;
+    private int timeScale = 5;
 
     private double normalSteps =1.7*timeScale; // 1.7 = 102/60
-
     private double fastSteps = 2.5 *timeScale;  //2.5 = 150/60
 
-    private int currentSteps;
+    private double normalHeartRate = 80;
+    private double fastHeartRate = 120;
+
+    private int currentSteps, currentHeartRates;
 
     private Runnable musicSwitcher;
 
     private UpdateUiCallBack mCallBack;
 
+    private Intent stepIntent, musicIntent, heartIntent;
+
+    public enum HeartrateDetectorState{
+        SIMULATION, NONE, REAL
+    }
+
+    private HeartrateDetectorState heartrateDetectorState = HeartrateDetectorState.NONE;
+
     private void MotionStateDecider(){
         currentSteps = stepBinder.getCurrentStep();
         stepBinder.refreshStep();
-        if(currentSteps<normalSteps){
-            currentType = MusicPlayingService.SLOW;
-        }
-        else if(currentSteps<fastSteps)
+        if(heartrateDetectorState==HeartrateDetectorState.NONE||heartbeatBinder==null)
         {
-            currentType = MusicPlayingService.NORMAL;
+            if(currentSteps<normalSteps){
+                currentType = MusicPlayingService.SLOW;
+            }
+            else if(currentSteps<fastSteps)
+            {
+                currentType = MusicPlayingService.NORMAL;
+            }
+            else{
+                currentType = MusicPlayingService.FAST;
+            }
+            if(heartbeatBinder==null)
+            {
+                heartrateDetectorState =HeartrateDetectorState.NONE;
+            }
         }
         else{
-            currentType = MusicPlayingService.FAST;
+            currentHeartRates = heartbeatBinder.getHeartbeat();
+            if(currentHeartRates<normalHeartRate){
+                currentType = MusicPlayingService.SLOW;
+            }
+            else if(currentHeartRates<fastHeartRate)
+            {
+                currentType = MusicPlayingService.NORMAL;
+            }
+            else{
+                currentType = MusicPlayingService.FAST;
+            }
         }
 //        Random random = new Random();
 //        currentType = random.nextInt(3);
@@ -70,9 +102,24 @@ public class MotionDetectorService extends Service {
         return new Runnable() {
             @Override
             public void run() {
+                Log.d(TAG, heartrateDetectorState.toString());
+                if(heartbeatBinder==null){
+                    Log.d(TAG, "run:  heartbeatBinder null");
+                }
+                else{
+                    Log.d(TAG, "run:  heartbeatBinder not null");
+                }
                 MotionStateDecider();
                 musicBinder.play(currentType);
-                mCallBack.updateUi(currentType,currentSteps);
+                mCallBack.updateUi(currentType);
+
+                if(heartrateDetectorState == HeartrateDetectorState.NONE){
+                    mCallBack.updateSteps(false,currentSteps);
+                }
+                else{
+                    mCallBack.updateSteps(true,currentHeartRates);
+                    Log.d(TAG, "run: "+Integer.toString(currentHeartRates));
+                }
                 handler.postDelayed(this,timeScale*1000);
             }
         };
@@ -105,16 +152,32 @@ public class MotionDetectorService extends Service {
         }
     };
 
+    private ServiceConnection heartConnection = new ServiceConnection() {
+        @Override
+        public void onServiceConnected(ComponentName name, IBinder service) {
+            heartbeatBinder = (HeartbeatService.HeartbeatBinder) service;
+
+        }
+
+        @Override
+        public void onServiceDisconnected(ComponentName name) {
+
+        }
+    };
+
     public MotionDetectorService() {
     }
 
     @Override
     public IBinder onBind(Intent intent) {
-        Intent stepIntent = new Intent(this, StepCountService.class);
-        Intent musicIntent = new Intent(this, MusicPlayingService.class);
-        boolean stepConnected = bindService(stepIntent,stepConnection,BIND_AUTO_CREATE);
-        boolean musicConnected = bindService(musicIntent,musicConnection,BIND_AUTO_CREATE);
+        stepIntent = new Intent(this, StepCountService.class);
+        musicIntent = new Intent(this, MusicPlayingService.class);
 
+        bindService(stepIntent,stepConnection,BIND_AUTO_CREATE);
+        bindService(musicIntent,musicConnection,BIND_AUTO_CREATE);
+
+        startService(stepIntent);
+        startService(musicIntent);
 
         return mBinder;
     }
@@ -140,9 +203,19 @@ public class MotionDetectorService extends Service {
             if(type<3 && type>=0)
             {
                 currentType = type;
-                mCallBack.updateUi(type,-1);
+                mCallBack.updateUi(type);
             }
 
+        }
+
+        void startHeartDetector(HeartrateDetectorState state){
+            heartrateDetectorState = state;
+            if(heartbeatBinder == null && state!=HeartrateDetectorState.NONE){
+                heartIntent = new Intent(MotionDetectorService.this, HeartbeatService.class);
+                bindService(heartIntent,heartConnection,BIND_AUTO_CREATE);
+
+                startService(heartIntent);
+            }
         }
 
         MotionDetectorService getService(){
@@ -151,10 +224,23 @@ public class MotionDetectorService extends Service {
     }
 
     @Override
-    public void onDestroy() {
-        super.onDestroy();
+    public boolean onUnbind(Intent intent) {
         unbindService(musicConnection);
         unbindService(stepConnection);
+        stopService(stepIntent);
+        stopService(musicIntent);
+        if(heartbeatBinder!=null){
+            unbindService(heartConnection);
+            stopService(heartIntent);
+        }
+        handler.removeCallbacks(musicSwitcher);
+        return super.onUnbind(intent);
+    }
+
+    @Override
+    public void onDestroy() {
+        super.onDestroy();
+
     }
 
     void detectMotionState(){

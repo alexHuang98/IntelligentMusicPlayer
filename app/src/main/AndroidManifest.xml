@@ -10,9 +10,13 @@
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
         <service
-            android:name=".MotionDetectorService"
+            android:name=".HeartbeatService"
             android:enabled="true"
             android:exported="true"></service>
+        <service
+            android:name=".MotionDetectorService"
+            android:enabled="true"
+            android:exported="true" />
         <service
             android:name=".stepcount.StepCountService"
             android:enabled="true"

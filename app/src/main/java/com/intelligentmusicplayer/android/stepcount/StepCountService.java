@@ -209,12 +209,12 @@ public class StepCountService extends Service implements SensorEventListener {
     public void onDestroy() {
         super.onDestroy();
         //取消前台进程
-        stopForeground(true);
 
     }
 
     @Override
     public boolean onUnbind(Intent intent) {
+
         return super.onUnbind(intent);
     }
 
