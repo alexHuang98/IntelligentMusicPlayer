@@ -1,17 +1,30 @@
 package com.intelligentmusicplayer.android;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import androidx.appcompat.app.ActionBar;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
+import androidx.core.view.GravityCompat;
+import androidx.drawerlayout.widget.DrawerLayout;
 
+import android.Manifest;
+
+import android.app.Activity;
 import android.content.ComponentName;
+import android.content.ContentResolver;
 import android.content.Intent;
 import android.content.ServiceConnection;
+import android.content.pm.PackageManager;
+import android.database.Cursor;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Message;
+import android.provider.MediaStore;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -20,7 +33,9 @@ import android.widget.Button;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.google.android.material.navigation.NavigationView;
 import com.google.android.material.snackbar.Snackbar;
+import com.intelligentmusicplayer.android.musicplaying.MusicPlayerManager;
 import com.intelligentmusicplayer.android.musicplaying.MusicPlayingService;
 
 public class MainActivity extends BaseActivity implements View.OnClickListener{
@@ -33,14 +48,14 @@ public class MainActivity extends BaseActivity implements View.OnClickListener{
 
     private MotionDetectorService motionDetectorService;
 
-    int currentType;
+    private DrawerLayout mDrawerLayout;
 
     private Handler mHandler = new Handler(){
         @Override
         public void handleMessage(@NonNull Message msg) {
             switch (msg.what){
                 case 1:
-                    refreshMovingState(msg.arg1);
+                    refreshMovingState((MusicPlayerManager.MotionState)msg.obj);
                     break;
                 case 2:
                     refreshCurrentSteps(msg.arg2,msg.arg1);
@@ -54,19 +69,13 @@ public class MainActivity extends BaseActivity implements View.OnClickListener{
         @Override
         public void onServiceConnected(ComponentName name, IBinder service) {
             motionBinder = (MotionDetectorService.MotionBinder) service;
-            if(motionBinder==null){
-                Log.d(TAG, "onServiceConnected: failed");
-            }
-            else{
-                Log.d(TAG, "onServiceConnected: successed");
-            }
             motionDetectorService = motionBinder.getService();
             motionDetectorService.registerCallback(new UpdateUiCallBack() {
                 @Override
-                public void updateUi(int type) {
+                public void updateUi(MusicPlayerManager.MotionState type) {
                     Message msg = new Message();
                     msg.what = 1;
-                    msg.arg1 = type;
+                    msg.obj = type;
                     mHandler.sendMessage(msg);
                 }
 
@@ -84,9 +93,6 @@ public class MainActivity extends BaseActivity implements View.OnClickListener{
                         msg.arg2=0;
                     mHandler.sendMessage(msg);
                 }
-
-
-
             });
 
         }
@@ -105,24 +111,67 @@ public class MainActivity extends BaseActivity implements View.OnClickListener{
         setContentView(R.layout.activity_main);
         toolbar = (Toolbar) findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
+        mDrawerLayout = (DrawerLayout) findViewById(R.id.drawer_layout);
+        ActionBar actionBar = getSupportActionBar();
+        if(actionBar!=null){
+            actionBar.setDisplayHomeAsUpEnabled(true);
+            actionBar.setHomeAsUpIndicator(R.drawable.ic_menu);
+
+        }
+
         Button play_button = (Button) findViewById(R.id.play);
         Button pause_button = (Button) findViewById(R.id.pause);
+        Button file_button = (Button) findViewById(R.id.file_choose);
+        NavigationView navView = (NavigationView)findViewById(R.id.nav_view);
         movingState = (TextView) findViewById(R.id.moving_state);
         currentSteps =(TextView) findViewById(R.id.current_steps);
+
         play_button.setOnClickListener(this);
         pause_button.setOnClickListener(this);
+        file_button.setOnClickListener(this);
+        navView.setCheckedItem(R.id.nav_main);
+        navView.setNavigationItemSelectedListener(new NavigationView.OnNavigationItemSelectedListener() {
+            @Override
+            public boolean onNavigationItemSelected(@NonNull MenuItem item) {
+                switch (item.getItemId()){
+                    default:
+                }
+                return false;
+            }
+        });
 
-        Intent intent = new Intent(this,MotionDetectorService.class);
+        if(ContextCompat.checkSelfPermission(MainActivity.this, Manifest.permission.
+                WRITE_EXTERNAL_STORAGE)!= PackageManager.PERMISSION_GRANTED){
+            ActivityCompat.requestPermissions(MainActivity.this,new String[]{Manifest.permission.
+                    WRITE_EXTERNAL_STORAGE},1);
+        }
+        else{
+            Utils.isGranted=true;
+        }
+
+        Intent intent = new Intent(getApplicationContext(),MotionDetectorService.class);
 
         bindService(intent,connection,BIND_AUTO_CREATE);
-        currentType = MusicPlayingService.SLOW;
-        refreshMovingState(currentType);
+        refreshMovingState(MusicPlayerManager.MotionState.SLOW);
     }
 
-    private void refreshMovingState(int state){
-        String typeToState[] ={"休闲","较强","激烈"};
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        switch (requestCode){
+            case 1:
+                if(grantResults.length>0 && grantResults[0] == PackageManager.PERMISSION_GRANTED){
+                    Utils.isGranted=true;
+                }
+                else{
+                    Toast.makeText(this,"拒绝权限只能播放系统自带歌曲",Toast.LENGTH_SHORT).show();
+                    Utils.isGranted = false;
+                }
+        }
+    }
 
-        movingState.setText("当前运动状态："+typeToState[state]);
+    private void refreshMovingState(MusicPlayerManager.MotionState state){
+
+        movingState.setText("当前运动状态："+Utils.state2str.get(state));
     }
 
     private void refreshCurrentSteps(int detectorType, Integer steps){
@@ -139,6 +188,9 @@ public class MainActivity extends BaseActivity implements View.OnClickListener{
     @Override
     public boolean onOptionsItemSelected(@NonNull MenuItem item) {
         switch (item.getItemId()){
+            case android.R.id.home:
+                mDrawerLayout.openDrawer(GravityCompat.START);
+                break;
             case R.id.simulation:
                 if (!item.isChecked()) {
                     item.setChecked(true);
@@ -160,22 +212,14 @@ public class MainActivity extends BaseActivity implements View.OnClickListener{
                 }
                 break;
             case R.id.switch_slow:
-                currentType=MusicPlayingService.SLOW;
-                break;
             case R.id.switch_normal:
-                currentType=MusicPlayingService.NORMAL;
-                break;
             case R.id.switch_fast:
-                currentType=MusicPlayingService.FAST;
+                MusicPlayerManager.MotionState selectedState = Utils.selection2id.get(item.getItemId());
+                motionBinder.setType(selectedState);
+                motionBinder.play();
+                refreshMovingState(selectedState);
                 break;
                 default:
-
-        }
-        if(item.getItemId()==R.id.switch_slow || item.getItemId()==R.id.switch_normal
-                ||item.getItemId()==R.id.switch_fast){
-            //refreshMovingState(currentType);
-            motionBinder.setType(currentType);
-            motionBinder.play();
         }
 
         return true;
@@ -189,13 +233,14 @@ public class MainActivity extends BaseActivity implements View.OnClickListener{
         }
         switch (v.getId()){
             case R.id.play:
-
                 motionBinder.play();
                 break;
             case R.id.pause:
                 motionBinder.pause();
                 break;
-                default:
+            case R.id.file_choose:
+                pickFile(v);
+            default:
         }
     }
 
@@ -210,5 +255,26 @@ public class MainActivity extends BaseActivity implements View.OnClickListener{
     private Uri rawToUri(int id){
         String uriStr = "android.resource://" + getPackageName() + "/" + id;
         return Uri.parse(uriStr);
+    }
+
+    public void pickFile(View view) {
+        Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
+        intent.addCategory(Intent.CATEGORY_OPENABLE);
+        intent.setType("audio/*");
+        this.startActivityForResult(intent, 0);
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (data == null) {
+            // 用户未选择任何文件，直接返回
+            return;
+        }
+
+        Uri uri = data.getData(); // 获取用户选择文件的URI
+        String path = Utils.getPath(this,uri);
+
+        Log.d(TAG, "onActivityResult: "+path);
     }
 }

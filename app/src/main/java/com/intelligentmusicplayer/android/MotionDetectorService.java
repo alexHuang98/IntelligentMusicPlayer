@@ -13,6 +13,9 @@ import android.util.Log;
 
 import androidx.annotation.NonNull;
 
+import com.intelligentmusicplayer.android.musicplaying.MusicPlayerManager;
+import com.intelligentmusicplayer.android.musicplaying.MusicPlayerManagerExo;
+import com.intelligentmusicplayer.android.musicplaying.MusicPlayerManagerInterface;
 import com.intelligentmusicplayer.android.musicplaying.MusicPlayingService;
 import com.intelligentmusicplayer.android.stepcount.StepCountService;
 
@@ -31,12 +34,14 @@ public class MotionDetectorService extends Service {
 
     // binders for related services
     private MusicPlayingService.MusicBinder musicBinder;
+    private MusicPlayerManagerInterface musicPlayerManager;
 
     private StepCountService.StepBinder stepBinder;
 
     private HeartbeatService.HeartbeatBinder heartbeatBinder;
 
-    int currentType = MusicPlayingService.SLOW;
+//    int currentType = MusicPlayingService.SLOW;
+    MusicPlayerManager.MotionState currentType = MusicPlayerManager.MotionState.SLOW;
 
     private int timeScale = 5;
 
@@ -66,14 +71,15 @@ public class MotionDetectorService extends Service {
         if(heartrateDetectorState==HeartrateDetectorState.NONE||heartbeatBinder==null)
         {
             if(currentSteps<normalSteps){
-                currentType = MusicPlayingService.SLOW;
+                currentType = MusicPlayerManager.MotionState.SLOW;
             }
             else if(currentSteps<fastSteps)
             {
-                currentType = MusicPlayingService.NORMAL;
+                currentType = MusicPlayerManager.MotionState.NORMAL;
             }
             else{
-                currentType = MusicPlayingService.FAST;
+                currentType = MusicPlayerManager.MotionState.FAST;
+
             }
             if(heartbeatBinder==null)
             {
@@ -83,14 +89,14 @@ public class MotionDetectorService extends Service {
         else{
             currentHeartRates = heartbeatBinder.getHeartbeat();
             if(currentHeartRates<normalHeartRate){
-                currentType = MusicPlayingService.SLOW;
+                currentType = MusicPlayerManager.MotionState.SLOW;
             }
             else if(currentHeartRates<fastHeartRate)
             {
-                currentType = MusicPlayingService.NORMAL;
+                currentType = MusicPlayerManager.MotionState.NORMAL;
             }
             else{
-                currentType = MusicPlayingService.FAST;
+                currentType = MusicPlayerManager.MotionState.FAST;
             }
         }
 //        Random random = new Random();
@@ -110,7 +116,8 @@ public class MotionDetectorService extends Service {
                     Log.d(TAG, "run:  heartbeatBinder not null");
                 }
                 MotionStateDecider();
-                musicBinder.play(currentType);
+                musicPlayerManager.play(currentType);
+//                musicBinder.play(currentType);
                 mCallBack.updateUi(currentType);
 
                 if(heartrateDetectorState == HeartrateDetectorState.NONE){
@@ -118,7 +125,6 @@ public class MotionDetectorService extends Service {
                 }
                 else{
                     mCallBack.updateSteps(true,currentHeartRates);
-                    Log.d(TAG, "run: "+Integer.toString(currentHeartRates));
                 }
                 handler.postDelayed(this,timeScale*1000);
             }
@@ -178,6 +184,7 @@ public class MotionDetectorService extends Service {
 
         startService(stepIntent);
         startService(musicIntent);
+        musicPlayerManager = new MusicPlayerManagerExo();
 
         return mBinder;
     }
@@ -185,7 +192,8 @@ public class MotionDetectorService extends Service {
     public class MotionBinder extends Binder {
         void play(){
             stepBinder.refreshStep();
-            musicBinder.play(currentType);
+//            musicBinder.play(currentType);
+            musicPlayerManager.play(currentType);
             if(musicSwitcher==null)
             {
                 musicSwitcher = getSwitcher();
@@ -194,18 +202,15 @@ public class MotionDetectorService extends Service {
         }
 
         void pause(){
-            musicBinder.pause();
+//            musicBinder.pause();
+            musicPlayerManager.pause();
             handler.removeCallbacks(musicSwitcher);
             musicSwitcher=null;
         }
 
-        void setType(int type){
-            if(type<3 && type>=0)
-            {
-                currentType = type;
-                mCallBack.updateUi(type);
-            }
-
+        void setType(MusicPlayerManager.MotionState type){
+            currentType = type;
+            mCallBack.updateUi(type);
         }
 
         void startHeartDetector(HeartrateDetectorState state){
@@ -234,6 +239,7 @@ public class MotionDetectorService extends Service {
             stopService(heartIntent);
         }
         handler.removeCallbacks(musicSwitcher);
+        musicPlayerManager.release();
         return super.onUnbind(intent);
     }
 

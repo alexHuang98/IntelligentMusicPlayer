@@ -7,6 +7,11 @@ import android.os.Binder;
 import android.os.IBinder;
 import android.widget.Toast;
 
+import com.google.android.exoplayer2.SimpleExoPlayer;
+import com.google.android.exoplayer2.audio.AudioListener;
+import com.google.android.exoplayer2.source.ConcatenatingMediaSource;
+import com.google.android.exoplayer2.source.LoopingMediaSource;
+import com.google.android.exoplayer2.source.MediaSource;
 import com.intelligentmusicplayer.android.R;
 
 public class MusicPlayingService extends Service {
@@ -30,6 +35,9 @@ public class MusicPlayingService extends Service {
     }
 
     private void initMediaPlayer(int id){
+        SimpleExoPlayer player = new SimpleExoPlayer.Builder(this).build();
+        
+
         try{
             mediaPlayer = MediaPlayer.create(this,id);
             mediaPlayer.prepare();

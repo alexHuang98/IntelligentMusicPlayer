@@ -1,5 +1,7 @@
 package com.intelligentmusicplayer.android;
 
+import com.intelligentmusicplayer.android.musicplaying.MusicPlayerManager;
+
 /**
  * 步数更新回调
  * Created by dylan on 16/9/27.
@@ -12,6 +14,6 @@ public interface UpdateUiCallBack {
      *
      * @param type 当前状态
      */
-    void updateUi(int type);
+    void updateUi(MusicPlayerManager.MotionState type);
     void updateSteps(boolean isHeartRated, int steps);
 }
